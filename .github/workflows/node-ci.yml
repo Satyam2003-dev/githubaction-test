@@ -1,4 +1,4 @@
-name: Node.js Static Site CI
+name: Node.js Static Site CI (S3)
 
 on:
   push:
@@ -6,61 +6,53 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-smoke-test:
+  ci:
     runs-on: ubuntu-latest
     env:
       PORT: 3000
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Cache npm
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
-          path: |
-            ~/.npm
-            ~/.cache
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
-          restore-keys: ${{ runner.os }}-node-
+          path: ~/.npm
+          key: ${{ runner.os }}-${{ hashFiles('**/package.json') }}
+          restore-keys: ${{ runner.os }}-
 
       - name: Install dependencies
         run: npm install
 
-      - name: Start server (background)
+      - name: Start server
         run: |
           nohup npm start > server.log 2>&1 & echo $! > server.pid
           sleep 3
 
-      - name: Smoke test - verify homepage
-        run: |
-          curl --fail --show-error --silent --retry 3 --retry-delay 1 http://127.0.0.1:${PORT}/ -o /tmp/index.html
-          wc -c /tmp/index.html
+      - name: Test homepage
+        run: curl --fail http://127.0.0.1:${PORT}/ -o index.html
 
-      - name: Check style.css
-        run: |
-          curl --fail --show-error --silent http://127.0.0.1:${PORT}/style.css -o /tmp/style.css
-          wc -c /tmp/style.css
+      - name: Test style.css
+        run: curl --fail http://127.0.0.1:${PORT}/style.css -o style.css
 
-      - name: Stop server
-        if: always()
-        run: |
-          if [ -f server.pid ]; then
-            kill "$(cat server.pid)" || true
-            rm -f server.pid
-          fi
-
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          name: node-server-artifacts
-          path: |
-            server.log
-            /tmp/index.html
-            /tmp/style.css
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload to S3
+        env:
+          BUCKET: ${{ vars.S3_BUCKET }}
+          PREFIX: site/${{ github.run_id }}
+        run: |
+          aws s3 cp server.log  s3://$BUCKET/$PREFIX/server.log --acl private
+          aws s3 cp index.html  s3://$BUCKET/$PREFIX/index.html --acl public-read
+          aws s3 cp style.css   s3://$BUCKET/$PREFIX/style.css --acl public-read
+          echo "Uploaded to s3://$BUCKET/$PREFIX/"
+
+      
