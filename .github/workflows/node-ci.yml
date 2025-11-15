@@ -50,7 +50,7 @@ jobs:
           BUCKET: ${{ vars.S3_BUCKET }}
           PREFIX: site/${{ github.run_id }}
         run: |
-          aws s3 cp server.log  s3://$BUCKET/$PREFIX/server.log --acl private
+          # aws s3 cp server.log  s3://$BUCKET/$PREFIX/server.log --acl private
           aws s3 cp index.html  s3://$BUCKET/$PREFIX/index.html --acl public-read
           aws s3 cp style.css   s3://$BUCKET/$PREFIX/style.css --acl public-read
           echo "Uploaded to s3://$BUCKET/$PREFIX/"
