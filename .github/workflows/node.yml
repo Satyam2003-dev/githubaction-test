@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-smoke-test:
     runs-on: ubuntu-latest
+    env:
+      PORT: 3000
 
     steps:
       - name: Checkout repository
@@ -17,6 +19,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+
+      - name: Verify lockfile exists
+        run: |
+          if [ ! -f package-lock.json ] && [ ! -f npm-shrinkwrap.json ]; then
+            echo "::error ::No package-lock.json or npm-shrinkwrap.json found. Please commit a lockfile and re-run the workflow."
+            exit 1
+          fi
 
       - name: Cache node modules
         uses: actions/cache@v4
@@ -28,30 +37,58 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: Install dependencies
+      - name: Install dependencies (npm ci)
         run: npm ci
 
       - name: Run server in background
-        # start server in background and save logs to server.log
         run: |
+          # start server in background, log to server.log and record pid
           nohup npm start > server.log 2>&1 & echo $! > server.pid
-          # give server a moment to start
+          # give server a moment to boot
           sleep 2
           echo "=== server log (first 200 lines) ==="
           head -n 200 server.log || true
 
-      - name: Smoke test - check homepage
-        # fail the job if the response is not HTTP 200
+      - name: Wait for HTTP 200 (retry loop)
         run: |
-          curl --fail --show-error --retry 3 --retry-delay 1 http://127.0.0.1:3000/ -o /tmp/index.html
-          echo "Homepage served — saved to /tmp/index.html"
-          wc -c /tmp/index.html
+          retries=8
+          until curl --silent --fail http://127.0.0.1:${PORT}/ -o /tmp/index.html || [ $retries -le 0 ]; do
+            echo "waiting for server... ($retries retries left)"
+            retries=$((retries-1))
+            sleep 1
+          done
+          if [ ! -s /tmp/index.html ]; then
+            echo "::error ::Server did not respond with a valid page."
+            echo "--- server.log ---"
+            tail -n +1 server.log || true
+            exit 1
+          fi
+          echo "Homepage fetched and saved to /tmp/index.html (size: $(wc -c /tmp/index.html))"
 
-      - name: Upload server log (artifact)
+      - name: Check static asset (style.css)
+        run: |
+          curl --fail http://127.0.0.1:${PORT}/style.css -o /tmp/style.css
+          echo "style.css size: $(wc -c /tmp/style.css)"
+
+      - name: Show a few lines of served HTML
+        run: head -n 40 /tmp/index.html || true
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            pid=$(cat server.pid)
+            echo "Killing server pid: $pid"
+            kill $pid || true
+            rm -f server.pid
+          fi
+
+      - name: Upload logs & served html (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: server-log
+          name: node-server-artifacts
           path: |
             server.log
             /tmp/index.html
+            /tmp/style.css
