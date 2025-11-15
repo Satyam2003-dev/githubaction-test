@@ -1,0 +1,69 @@
+name: Node.js Static Site CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    env:
+      PORT: 3000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Cache node modules (uses package.json)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies (npm install)
+        run: npm install
+
+      - name: Run server in background
+        run: |
+          nohup npm start > server.log 2>&1 & echo $! > server.pid
+          sleep 2
+          echo "=== server log (first 200 lines) ==="
+          head -n 200 server.log || true
+
+      - name: Smoke test - check homepage
+        run: |
+          curl --fail --show-error --retry 3 --retry-delay 1 http://127.0.0.1:${PORT}/ -o /tmp/index.html
+          echo "Homepage served — saved to /tmp/index.html"
+          wc -c /tmp/index.html
+
+      - name: Check static asset (style.css)
+        run: |
+          curl --fail http://127.0.0.1:${PORT}/style.css -o /tmp/style.css
+          wc -c /tmp/style.css
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-server-artifacts
+          path: |
+            server.log
+            /tmp/index.html
+            /tmp/style.css
