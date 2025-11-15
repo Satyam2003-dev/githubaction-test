@@ -1,8 +1,8 @@
-name: CI-Build
-
+name: C++ CI 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-and-run:
@@ -15,8 +15,20 @@ jobs:
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
-      - name: Build with Makefile
-        run: make build
+      - name: Compile source
+        # change main.cpp to your source file(s) if different
+        run: |
+          g++ -std=c++17 -Wall -Wextra -O2 main.cpp -o main
+          echo "Compiled: $(ls -l main || true)"
 
-      - name: Run program
-        run: make run
+      - name: Run binary
+        run: |
+          echo "---- Program output ----"
+          ./main
+
+      - name: Upload binary artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-binary
+          path: ./main
