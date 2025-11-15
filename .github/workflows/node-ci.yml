@@ -15,47 +15,44 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js 18
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Cache node modules (uses package.json)
+      - name: Cache npm
         uses: actions/cache@v4
         with:
           path: |
             ~/.npm
             ~/.cache
           key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          restore-keys: ${{ runner.os }}-node-
 
-      - name: Install dependencies (npm install)
+      - name: Install dependencies
         run: npm install
 
-      - name: Run server in background
+      - name: Start server (background)
         run: |
           nohup npm start > server.log 2>&1 & echo $! > server.pid
-          sleep 2
-          echo "=== server log (first 200 lines) ==="
-          head -n 200 server.log || true
+          sleep 3
 
-      - name: Smoke test - check homepage
+      - name: Smoke test - verify homepage
         run: |
-          curl --fail --show-error --retry 3 --retry-delay 1 http://127.0.0.1:${PORT}/ -o /tmp/index.html
-          echo "Homepage served — saved to /tmp/index.html"
+          curl --fail --show-error --silent --retry 3 --retry-delay 1 http://127.0.0.1:${PORT}/ -o /tmp/index.html
           wc -c /tmp/index.html
 
-      - name: Check static asset (style.css)
+      - name: Check style.css
         run: |
-          curl --fail http://127.0.0.1:${PORT}/style.css -o /tmp/style.css
+          curl --fail --show-error --silent http://127.0.0.1:${PORT}/style.css -o /tmp/style.css
           wc -c /tmp/style.css
 
       - name: Stop server
         if: always()
         run: |
           if [ -f server.pid ]; then
-            kill $(cat server.pid) || true
+            kill "$(cat server.pid)" || true
+            rm -f server.pid
           fi
 
       - name: Upload artifacts
