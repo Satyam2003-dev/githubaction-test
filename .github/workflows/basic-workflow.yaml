@@ -9,4 +9,8 @@ jobs:
     steps:
       - name: basic workflow made
         run: echo "i built a workflow"
-
+      - name: Error
+        run: echo "i made an error"
+      - name: exit
+        run: Exit 1
+        
