@@ -1,0 +1,12 @@
+name: basic workflow
+on:
+  push: 
+    branches: workflows
+jobs:
+  doing:
+    name: do things
+    runs-on: ububtu-latest
+    steps:
+      - name: basic workflow made
+        run: echo "i built a workflow"
+
