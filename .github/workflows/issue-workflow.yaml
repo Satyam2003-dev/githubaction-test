@@ -1,0 +1,15 @@
+name: Issue events
+
+on: 
+  issues:
+    types: [opened]
+jobs:
+  doing-more-things:
+    name: Doing things from issues
+    runs-on: ubuntuj-latest
+    steps:
+      - name: doing things from issues
+        env:
+          EVENT_NAME: ${{github.event_name}}
+          EVENT_ACTION: ${{github.event_action}}
+        run: echo "the action $'{EVENT_ACTION}' was performed  against $'{EVENT_NAME}'. "
