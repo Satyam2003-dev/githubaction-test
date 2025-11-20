@@ -1,5 +1,5 @@
 name: Dependent Jobs
-on:
+on: 
   push:
     branches: feature/dependent
 jobs:
