@@ -1,0 +1,14 @@
+name: concurrenct workflow
+on: 
+  push: 
+    branches: feature/concurrency
+jobs:
+  do-things:
+    name: do things with concurrency
+    runs-on: ubuntu-latest
+    concurrency:
+      group: static group
+    steps:
+      - name: The Thing I've Done
+        run: echo "i have donbe a things"; sleep 15;
+    
