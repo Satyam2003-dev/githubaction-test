@@ -1,7 +1,7 @@
 name: Dependent Jobs
 on:
   push:
-    branches: feature/dependent
+    branches: main
 jobs:
   first-job:
     name: First Job (parallel)
