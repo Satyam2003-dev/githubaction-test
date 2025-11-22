@@ -1,7 +1,7 @@
 name: Concurrency Group No. 2
 on:
   push:
-    branches: feature/concurrency
+    branches: main
 jobs:
   do-things:
     name: Do Other Things With Concurrency
